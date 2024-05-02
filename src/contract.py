@@ -2,13 +2,13 @@ import grpc
 import os
 import sys
 import logging
+import json
 
 logging.basicConfig(
     filename='contract_handler.log',  # Укажите имя файла, куда будут записываться логи
     level=logging.INFO,  # Уровень логгирования (INFO, DEBUG, ERROR и т. д.)
     format='%(asctime)s - %(levelname)s - %(message)s'  # Формат записи логов
 )
-
 
 from protobuf import common_pb2, contract_pb2, contract_pb2_grpc
 
@@ -63,58 +63,46 @@ class ContractHandler:
     def __handle_call_transaction(self, contract_transaction_response):
         call_transaction = contract_transaction_response.transaction
         metadata = [(AUTH_METADATA_KEY, contract_transaction_response.auth_token)]
+        data = []
+        try:
+            tx_type = self.get_string_value(call_transaction, "tx_type")
+            if tx_type == "client_registry":
+                data = self.client_registry(call_transaction, metadata)
+            elif tx_type == "maker_registry":
+                data = self.maker_registry(call_transaction, metadata)
+            elif tx_type == "distributor_registry":
+                data = self.distributor_registry(call_transaction, metadata)
+            elif tx_type == "review_register":
+                data = self.review_register(call_transaction, metadata)
+            elif tx_type == "create_product":
+                data = self.create_product(call_transaction, metadata)
+            elif tx_type == "review_product":
+                data = self.review_product(call_transaction, metadata)
+            elif tx_type == "create_order":
+                data = self.create_order(call_transaction, metadata)
+            elif tx_type == "review_order":
+                data = self.review_order(call_transaction, metadata)
+            elif tx_type == "user_order_review":
+                data = self.user_order_review(call_transaction, metadata)
+            else:
+                logging.error(f"неверный тип транзакции: {tx_type}")
 
-        data = self.client_registry(call_transaction, metadata)
-        # match tx_type:
-        #     case "client_registry":
-        #         request = self.client_registry(call_transaction, metadata)
-        #     case "maker_registry":
-        #         request = self.maker_registry(call_transaction, metadata)
-        #     case "distributor_registry":
-        #         request = self.distributor_registry(call_transaction, metadata)
-        #     case "review_register":
-        #         request = self.review_register(call_transaction, metadata)
-        #     case "create_product":
-        #         request = self.create_product(call_transaction, metadata)
-        #     case "review_product":
-        #         request = self.review_product(call_transaction, metadata)
-        #     case "change_product":
-        #         request = self.change_product(call_transaction, metadata)
-        #     case "create_order":
-        #         request = self.create_product(call_transaction, metadata)
-        #     case "review_order":
-        #         request = self.review_order(call_transaction, metadata)
-        #     case "accept_order":
-        #         request = self.accept_order(call_transaction, metadata)
-        #     case "cancel_order":
-        #         request = self.cancel_order(call_transaction, metadata)
-        #     case "get_user":
-        #         pass
-        #     case "get_all_user":
-        #         pass
-        #     case "get_product":
-        #         pass
-        #     case "get_all_products":
-        #         pass
-        #     case "get_order":
-        #         pass
-        #     case "get_all_orders":
-        #         pass
+            request = contract_pb2.ExecutionSuccessRequest(
+                tx_id=call_transaction.id,
+                results=data
+            )
 
-        request = contract_pb2.ExecutionSuccessRequest(
-            tx_id=call_transaction.id,
-            results=data
-        )
-
-        response = self.client.CommitExecutionSuccess(request=request, metadata=metadata)
-        print("in call tx response '{}'".format(response))
+            response = self.client.CommitExecutionSuccess(request=request, metadata=metadata)
+            logging.info("in call tx response '{}'".format(response))
+        except Exception as error:
+            logging.info(f"{error}")
 
     @staticmethod
     def get_string_value(call_transaction, key):
         res = ''
         for param in call_transaction.params:
             if param.key == key:
-                res = param.str_value
+                res = param.string_value
                 break
         return res
 
@@ -150,7 +138,7 @@ class ContractHandler:
 
             data = [
                 common_pb2.DataEntry(key=f"request_user_{user_id + 1}",
-                                     str_value=self.get_string_value(call_transaction, "user")),
+                                     string_value=self.get_string_value(call_transaction, "user")),
                 common_pb2.DataEntry(key="users", int_value=user_id + 1)
             ]
 
@@ -169,7 +157,7 @@ class ContractHandler:
 
             data = [
                 common_pb2.DataEntry(key=f"request_maker_{maker_id + 1}",
-                                     str_value=self.get_string_value(call_transaction, "maker")),
+                                     string_value=self.get_string_value(call_transaction, "maker")),
                 common_pb2.DataEntry(key="makers", int_value=maker_id + 1)
             ]
 
@@ -188,7 +176,7 @@ class ContractHandler:
 
             data = [
                 common_pb2.DataEntry(key=f"request_distributor_{distributor_id + 1}",
-                                     str_value=self.get_string_value(call_transaction, "distributor")),
+                                     string_value=self.get_string_value(call_transaction, "distributor")),
                 common_pb2.DataEntry(key="distributors", int_value=distributor_id + 1)
             ]
 
@@ -196,7 +184,7 @@ class ContractHandler:
         except Exception as error:
             logging.info(f'{error}')
 
-    def review_register(self, call_transaction, metadata): # !!!!!!!!!!
+    def review_register(self, call_transaction, metadata):
         """одобряем регистрацию"""
 
         distributor_id = self.get_int_value(call_transaction, key="distributor")
@@ -215,16 +203,22 @@ class ContractHandler:
         )
 
         contract_key = self.client.GetContractKey(request=contract_key_request, metadata=metadata)
-        _id = contract_key.entry.str_value
+        request = contract_key.entry.string_value
 
+        new_val = json.loads(request)
+        new_val['status'] = True
+        val = json.dumps(new_val)
+
+        user = new_val['public_key']  # можно получать ключ по другому
         data = [
-            common_pb2.DataEntry(key=get_key,str_value=""), # меняем флаг на true
+            common_pb2.DataEntry(key=user, string_value=val)
         ]
 
         return data
 
     # Блок создание нового товара
     def create_product(self, call_transaction, metadata):
+        # проверка роли ??
         try:
             contract_key_request = contract_pb2.ContractKeyRequest(
                 contract_id=call_transaction.contract_id,
@@ -235,7 +229,7 @@ class ContractHandler:
 
             data = [
                 common_pb2.DataEntry(key=f"product_{product_id + 1}",
-                                     str_value=self.get_string_value(call_transaction, "product")),
+                                     string_value=self.get_string_value(call_transaction, "product")),
                 common_pb2.DataEntry(key="products", int_value=product_id + 1)
             ]
 
@@ -243,27 +237,39 @@ class ContractHandler:
         except Exception as error:
             logging.info(f'{error}')
 
-    def review_product(self, call_transaction, metadata): # !!!!!!!!!!
+    def review_product(self, call_transaction, metadata):
         """Добавляем данные в продукт и публикуем его"""
-        product_id = self.get_int_value(call_transaction, key="product")
-        contract_key_request = contract_pb2.ContractKeyRequest(
-            contract_id=call_transaction.contract_id,
-            key=f"product_{product_id}"
-        )
+        try:
+            product_id = self.get_int_value(call_transaction, key="product")
+            contract_key_request = contract_pb2.ContractKeyRequest(
+                contract_id=call_transaction.contract_id,
+                key=f"product_{product_id}"
+            )
 
-        contract_key = self.client.GetContractKey(request=contract_key_request, metadata=metadata)
-        product = contract_key.entry.str_value
+            contract_key = self.client.GetContractKey(request=contract_key_request, metadata=metadata)
+            product = contract_key.entry.string_value
 
-        data = [
-            common_pb2.DataEntry(key=f"product_{product_id}",
-                                 value="product") # работаем со значением
-        ]
+            new_product = json.loads(product)
 
-        return data
+            new_product["min_v"] = self.get_int_value(call_transaction, key="min_v")
+            new_product["max_v"] = self.get_int_value(call_transaction, key='max_v')
+            new_product["regions"] = self.get_string_value(call_transaction, key="regions")
+
+            new_product_value = json.dumps(new_product, ensure_ascii=False)
+
+            data = [
+                common_pb2.DataEntry(key=f"product_{product_id}",
+                                     string_value=new_product_value)  # работаем со значением
+            ]
+
+            return data
+        except Exception as error:
+            logging.info(f'{error}')
 
     # Блок создания заказа
 
     def create_order(self, call_transaction, metadata):
+        # проверка роли ??
         try:
             contract_key_request = contract_pb2.ContractKeyRequest(
                 contract_id=call_transaction.contract_id,
@@ -273,8 +279,8 @@ class ContractHandler:
             order_id = contract_key.entry.int_value
 
             data = [
-                common_pb2.DataEntry(key=f"request_product_{order_id + 1}",
-                                     str_value=self.get_string_value(call_transaction, "order")),
+                common_pb2.DataEntry(key=f"order_{order_id + 1}",
+                                     string_value=self.get_string_value(call_transaction, "order")),
                 common_pb2.DataEntry(key="orders", int_value=order_id + 1)
             ]
 
@@ -283,32 +289,81 @@ class ContractHandler:
             logging.info(f'{error}')
 
     def review_order(self, call_transaction, metadata):
-        pass
+        try:
+            payment_term = self.get_string_value(call_transaction, "payment_term")
+            new_date = self.get_string_value(call_transaction, key="new_date")
+            total_price = self.get_int_value(call_transaction, key="total_price")
+
+            order_id = self.get_int_value(call_transaction, "order_id")
+            contract_key_request = contract_pb2.ContractKeyRequest(
+                contract_id=call_transaction.contract_id,
+                key=f"order_{order_id}"
+            )
+            contract_key = self.client.GetContractKey(request=contract_key_request, metadata=metadata)
+            order = contract_key.entry.string_value
+            new_order = json.loads(order)
+
+            if payment_term or new_date:
+                status = "Ожидает подтверждения клиента"
+                new_order["payment_term"] = payment_term
+                new_order["new_date"] = new_date
+            else:
+                pre_payment = self.get_int_value(call_transaction, "pre_payment")
+                if pre_payment:
+                    status = "Ожидает оплаты"
+                else:
+                    status = "Исполняется"
+
+            new_order["status"] = status
+            new_order["total_price"] = total_price
+
+            order = json.dumps(new_order, ensure_ascii=False)
+
+            data = [
+                common_pb2.DataEntry(key=f"order_{order_id}",
+                                     string_value=order)
+            ]
+
+            return data
+        except Exception as error:
+            logging.info(f'{error}')
 
     def user_order_review(self, call_transaction, metadata):
-        pass
+        try:
+            order_id = self.get_int_value(call_transaction, "order_id")
+            contract_key_request = contract_pb2.ContractKeyRequest(
+                contract_id=call_transaction.contract_id,
+                key=f"order_{order_id}"
+            )
+            contract_key = self.client.GetContractKey(request=contract_key_request, metadata=metadata)
+            order = contract_key.entry.string_value
+            new_order = json.loads(order)
 
+            accept = self.get_bool_value(call_transaction, "accept")
+            if accept:
+                new_order['accept'] = True
+                pre_payment = self.get_int_value(call_transaction, "pre_payment")
+                if pre_payment:
+                    status = "Ожидает оплаты"
+                else:
+                    status = "Исполняется"
+            else:
+                new_order['accept'] = False
+                status = "Отменена"
 
-    # Блок получения данных
+            new_order['status'] = status
+            order = json.dumps(new_order, ensure_ascii=False)
 
-    # def get_user(self, call_transaction, metadata):
-    #     pass
-    #
-    # def get_all_user(self, call_transaction, metadata):
-    #     pass
-    #
-    # def get_product(self, call_transaction, metadata):
-    #     pass
-    #
-    # def get_all_products(self, call_transaction, metadata):
-    #     pass
-    #
-    # def get_order(self, call_transaction, metadata):
-    #     pass
-    #
-    # def get_all_orders(self, call_transaction, metadata):
-    #     pass
+            data = [
+                common_pb2.DataEntry(
+                    key=f"order_{order_id}",
+                    string_value=order
+                )
+            ]
 
+            return data
+        except Exception as error:
+            logging.info(f'{error}')
 
 def run(connection_id, node_host, node_port, connection_token):
     # NOTE(gRPC Python Team): .close() is possible on a channel and should be
@@ -316,8 +371,8 @@ def run(connection_id, node_host, node_port, connection_token):
     # of the code.
     with grpc.insecure_channel('{}:{}'.format(node_host, node_port)) as channel:
         stub = contract_pb2_grpc.ContractServiceStub(channel)
-        handler = ContractHandler(stub, connection_id) # Создание объекта контракта
-        handler.start(connection_token) # запускаем смарт контракт
+        handler = ContractHandler(stub, connection_id)  # Создание объекта контракта
+        handler.start(connection_token)  # запускаем смарт контракт
 
 
 CONNECTION_ID_KEY = 'CONNECTION_ID'
