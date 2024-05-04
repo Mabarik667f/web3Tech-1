@@ -66,7 +66,9 @@ class ContractHandler:
         data = []
         try:
             tx_type = self.get_string_value(call_transaction, "tx_type")
-            if tx_type == "client_registry":
+            if tx_type == 'operator_registry':
+                data = self.operator_registry(call_transaction)
+            elif tx_type == "client_registry":
                 data = self.client_registry(call_transaction, metadata)
             elif tx_type == "maker_registry":
                 data = self.maker_registry(call_transaction, metadata)
@@ -125,6 +127,19 @@ class ContractHandler:
         return res
 
     # Блок регистации
+    def operator_registry(self, call_transaction):
+        # получаем ключ, из которого можно взять данные
+
+        try:
+            data = [
+                common_pb2.DataEntry(key=f"operator",
+                                     string_value=self.get_string_value(call_transaction, "operator")),
+            ]
+
+            return data
+        except Exception as error:
+            logging.info(f'{error}')
+
     def client_registry(self, call_transaction, metadata):
         # получаем ключ, из которого можно взять данные
 
@@ -209,7 +224,7 @@ class ContractHandler:
         new_val['status'] = True
         val = json.dumps(new_val)
 
-        user = new_val['public_key']  # можно получать ключ по другому
+        user = new_val['email']  # можно получать ключ по другому
         data = [
             common_pb2.DataEntry(key=user, string_value=val)
         ]
