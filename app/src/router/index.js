@@ -7,8 +7,10 @@ import MakerRegisterView from "@/views/MakerRegisterView.vue";
 import DistributorRegisterView from "@/views/DistributorRegisterView.vue";
 import ProfileView from "@/views/ProfileView.vue";
 import OperatorRegisterView from "@/views/OperatorRegisterView.vue";
-import CreateOrderView from "@/views/CreateOrderView.vue"
-import CreateProductView from "@/views/CreateProductView.vue"
+import CreateOrderView from "@/views/CreateOrderView.vue";
+import CreateProductView from "@/views/CreateProductView.vue";
+import LoginView from "@/views/LoginView.vue";
+import ProductCardsView from "@/views/ProductCardsView.vue";
 
 const authGuard = (to, from, next) => {
   if (!store.state.auth.isAuth) {
@@ -58,6 +60,16 @@ const routes = [
     path: '/createOrder',
     name: 'createOrder',
     component: CreateOrderView,
+  },
+  {
+    path: '/login',
+    name: 'login',
+    component: LoginView,
+  },
+  {
+    path: '/products',
+    name: 'products',
+    component: ProductCardsView
   }
 ]
 

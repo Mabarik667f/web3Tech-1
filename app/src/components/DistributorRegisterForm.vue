@@ -46,7 +46,7 @@ export default {
 
 
 <template>
-        <wave-form @submit.prevent="distributorRegistryHook">
+        <wave-form @submit.prevent="distributorRegistryHook" class="default-form">
             <template v-slot:header>
                 <h1>Зарегистрироваться</h1>
             </template>

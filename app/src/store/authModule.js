@@ -1,4 +1,5 @@
 import {TRANSACTIONS, Keypair, CONTRACT_ID, sdk, contractVersion} from "@/contractData";
+import router from "@/router";
 export const authModule = {
     state: () => ({
         isAuth: false,
@@ -41,18 +42,25 @@ export const authModule = {
             localStorage.setItem('status', status);
             localStorage.setItem('email', email);
 
-            await dispatch('getStore');
+            await dispatch('getStorage');
 
         },
         async login({dispatch, commit}, formData) {
             try {
                 const user = await sdk.contracts.getKey(CONTRACT_ID, formData.email);
-                let data = JSON.parse(user);
+                console.log(user);
+                let data = JSON.parse(user.value);
                 if (data.password === formData.password) {
-                    commit('setAuth', {isAuth: true, role: data.role, seed: data.seed, status: data.status, email: formData.email});
-                    dispatch('setStorage', {isAuth: true, role: data.role, seed: data.seed, status: data.status, email: formData.email});
+                    let status = data.status;
+                    if(data.role === 'operator') {
+                        status = true;
+                    }
+                    commit('setAuth', {isAuth: true, role: data.role, seed: data.seed, status: status, email: formData.email});
+                    dispatch('setStorage', {isAuth: true, role: data.role, seed: data.seed, status: status, email: formData.email});
+                    return true
                 } else {
                     console.log('Пароль не верен!');
+                    return false
                 }
             } catch (error) {
                 console.log(error);
@@ -61,8 +69,9 @@ export const authModule = {
         async logout({dispatch, commit}) {
             dispatch('setStorage', {isAuth: false,  role: '', seed: '', status: false, email: ''});
             commit('setAuth', {isAuth: false, role: '', seed: '', status: false, email: ''});
+            router.push('/');
         },
-        async operatorRegistry({dispatch, commit}, formData) {
+        async operatorRegistry({dispatch}, formData) {
             const config = await sdk.node.config();
 
             const fee = config.minimumFee[104];
@@ -91,14 +100,14 @@ export const authModule = {
                 params: [
                     {
                         type: "string",
-                        key: "user",
+                        key: "operator",
                         value: value
                         
                     },
                     {
+                        type: 'string',
                         key: 'tx_type',
                         value: "operator_registry",
-                        type: 'string'
                     }
                 ]
             });
@@ -109,7 +118,7 @@ export const authModule = {
 
             console.log(res);
 
-            await dispatch('setStorage', {isAuth: true,  role: 'operator', seed: seed, status: false, email: formData.email});
+            await dispatch('setStorage', {isAuth: true,  role: 'operator', seed: seed, status: true, email: formData.email});
 
         },
         async clientRegistry({dispatch}, formData) {
@@ -130,7 +139,8 @@ export const authModule = {
                 role: 'user',
                 seed: seed,
                 public_key: publicKey,
-                password: formData.password
+                password: formData.password,
+                status: false
             });
 
             const tx = TRANSACTIONS.CallContract.V2({
@@ -145,9 +155,9 @@ export const authModule = {
                         value: value
                     },
                     {
+                        type: 'string',
                         key: 'tx_type',
                         value: "client_registry",
-                        type: 'string'
                     }
                 ]
             });
@@ -183,6 +193,7 @@ export const authModule = {
                 role: 'maker',
                 seed: seed,
                 public_key: publicKey,
+                products: [],
                 password: formData.password})
 
             const tx = TRANSACTIONS.CallContract.V2({
@@ -193,13 +204,13 @@ export const authModule = {
                 params: [
                     {
                         type: "string",
-                        key: "user",
+                        key: "maker",
                         value: value
                     },
                     {
+                        type: 'string',
                         key: 'tx_type',
                         value: "maker_registry",
-                        type: 'string'
                     }
                 ]
             });
@@ -244,13 +255,13 @@ export const authModule = {
                 params: [
                     {
                         type: "string",
-                        key: "user",
+                        key: "distributor",
                         value: value
                     },
                     {
+                        type: 'string',
                         key: 'tx_type',
                         value: "distributor_registry",
-                        type: 'string'
                     }
                 ]
             });
@@ -264,36 +275,36 @@ export const authModule = {
             await dispatch('setStorage', {isAuth: true,  role: 'distributor', seed: seed, status: false, email: formData.email});
         },
 
-        async reviewRegister(formData) {
+        async reviewRegister({state}, formData) {
+            console.log(state);
+            
             const config = await sdk.node.config();
 
             const fee = config.minimumFee[104];
 
-            const keypair = await Keypair.generate(16);
+            const keypair = await Keypair.fromExistingSeedPhrase(state.seed);
 
             const publicKey = await keypair.publicKey();
-            const seed = keypair.phrase();
 
             const tx = TRANSACTIONS.CallContract.V2({
                 contractId: CONTRACT_ID,
                 fee: fee,
                 contractVersion: contractVersion,
                 senderPublicKey: publicKey,
-                params: [
-                    {
-                        type: "string",
-                        key: `${formData.key}`,
-                        value: `${formData.value}`
+                params: 
+                [
+                    {type: "integer",
+                     key: formData.key,
+                     value: formData.id
                     },
-                    {
-                        key: 'tx_type',
-                        value: "review_register",
-                        type: 'string'
+                    {type: "string",
+                     key: "tx_type",
+                     value: "review_register"
                     }
-                ]
+                    ]
             });
 
-            const signedTx = await sdk.signer.getSignedTx(tx, seed);
+            const signedTx = await sdk.signer.getSignedTx(tx, state.seed);
 
             const res = await sdk.broadcast(signedTx);
 

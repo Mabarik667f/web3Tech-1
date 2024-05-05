@@ -54,7 +54,8 @@ class ContractHandler:
                      common_pb2.DataEntry(key="makers", int_value=0),
                      common_pb2.DataEntry(key="distributors", int_value=0),
                      common_pb2.DataEntry(key="products", int_value=0),
-                     common_pb2.DataEntry(key="orders", int_value=0)]
+                     common_pb2.DataEntry(key="orders", int_value=0),
+                     common_pb2.DataEntry(key='distributors_list', string_value='[]')]
         )
         metadata = [(AUTH_METADATA_KEY, contract_transaction_response.auth_token)]
         response = self.client.CommitExecutionSuccess(request=request, metadata=metadata)  # ответ, сохранение данных
@@ -126,14 +127,26 @@ class ContractHandler:
                 break
         return res
 
+    def get_distributors_list(self, call_transaction, metadata):
+        distributors = contract_pb2.ContractKeyRequest(
+            contract_id=call_transaction.contract_id,
+            key="distributors_list"
+        )
+        dist_key = self.client.GetContractKey(request=distributors, metadata=metadata)
+        dist_list: list = json.loads(dist_key.entry.string_value)
+
+        return dist_list
+
     # Блок регистации
     def operator_registry(self, call_transaction):
         # получаем ключ, из которого можно взять данные
 
         try:
+            op_data = self.get_string_value(call_transaction, 'operator')
+
+            key = json.loads(op_data)['email']
             data = [
-                common_pb2.DataEntry(key=f"operator",
-                                     string_value=self.get_string_value(call_transaction, "operator")),
+                common_pb2.DataEntry(key=key, string_value=op_data),
             ]
 
             return data
@@ -222,12 +235,19 @@ class ContractHandler:
 
         new_val = json.loads(request)
         new_val['status'] = True
-        val = json.dumps(new_val)
+        val = json.dumps(new_val, ensure_ascii=False)
 
         user = new_val['email']  # можно получать ключ по другому
         data = [
-            common_pb2.DataEntry(key=user, string_value=val)
+            common_pb2.DataEntry(key=user, string_value=val),
+            common_pb2.DataEntry(key=get_key, string_value=val)
         ]
+
+        if distributor_id != 0:
+            dist_list: list = self.get_distributors_list(call_transaction, metadata)
+            dist_list.append(user)
+            data.append(common_pb2.DataEntry(key="distributors_list", string_value=json.dumps(dist_list,
+                                                                                              ensure_ascii=False)))
 
         return data
 
@@ -268,7 +288,24 @@ class ContractHandler:
 
             new_product["min_v"] = self.get_int_value(call_transaction, key="min_v")
             new_product["max_v"] = self.get_int_value(call_transaction, key='max_v')
-            new_product["regions"] = self.get_string_value(call_transaction, key="regions")
+
+            dist_list: list = self.get_distributors_list(call_transaction, metadata)
+
+            distributors = []
+            for key in dist_list:
+                dist_request = contract_pb2.ContractKeyRequest(
+                    contract_id=call_transaction.contract_id,
+                    key=key
+                )
+
+                dist_key = self.client.GetContractKey(request=dist_request, metadata=metadata)
+                val = json.loads(dist_key.entry.string_value)
+                for region in new_product['regions']:
+                    if region in val['regions']:
+                        distributors.append(key)
+                        break
+
+            new_product["distributors"] = distributors
 
             new_product_value = json.dumps(new_product, ensure_ascii=False)
 
@@ -318,16 +355,11 @@ class ContractHandler:
             order = contract_key.entry.string_value
             new_order = json.loads(order)
 
+            status = "Ожидает подтверждения клиента"
+
             if payment_term or new_date:
-                status = "Ожидает подтверждения клиента"
                 new_order["payment_term"] = payment_term
                 new_order["new_date"] = new_date
-            else:
-                pre_payment = self.get_int_value(call_transaction, "pre_payment")
-                if pre_payment:
-                    status = "Ожидает оплаты"
-                else:
-                    status = "Исполняется"
 
             new_order["status"] = status
             new_order["total_price"] = total_price
@@ -357,7 +389,7 @@ class ContractHandler:
             accept = self.get_bool_value(call_transaction, "accept")
             if accept:
                 new_order['accept'] = True
-                pre_payment = self.get_int_value(call_transaction, "pre_payment")
+                pre_payment = self.get_bool_value(call_transaction, "pre_payment")
                 if pre_payment:
                     status = "Ожидает оплаты"
                 else:

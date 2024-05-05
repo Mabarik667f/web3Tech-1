@@ -5,7 +5,7 @@ export default {
 </script>
 
 <template>
-    <form method="post" class="default-form">
+    <form method="post">
         <slot name="header"></slot>
         <slot name="fields"></slot>
         <slot name="button"></slot>

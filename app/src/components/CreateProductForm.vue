@@ -1,5 +1,7 @@
 <script>
 import { ref } from 'vue';
+import createProduct from '@/hooks/createProduct';
+import router from '@/router';
 export default {
     data() {
         return {
@@ -17,39 +19,50 @@ export default {
             regions: []
         })
 
-        return {formData}
+        const createProductHook = async () => {
+            const {func} = createProduct(formData.value);
+            func()
+            router.push('/profile')
+        }
+        return {formData, createProductHook}
     }
 }
 </script>
 
 <template>
-        <wave-form>
+        <wave-form @submit.prevent="createProductHook()" class="default-form">
             <template v-slot:header>
-                <h1>Создать Товар</h1>
+                <h1 class="form-header">Создать Товар</h1>
             </template>
             <template v-slot:fields>
-                <div>
-                    <label>Название: </label>
+                <div class="form-group">
+                    <label :for="'title'">Название: </label>
                     <wave-input
-                    v-model="formData.title">
+                    v-model="formData.title"
+                    :id="'title'"
+                    class="form-control">
                     </wave-input>
                 </div>
-                <div>
-                    <label>Описание: </label>
+                <div class="form-group">
+                    <label :for="'describe'">Описание: </label>
                     <textarea
-                    v-model="formData.describe">
+                    v-model="formData.describe"
+                    :id="'describe'"
+                    class="form-control">
                     </textarea>
                 </div>
-                <div>
-                    <label>Регионы: </label>
+                <div class="from-group">
+                    <label :for="'regions'">Регионы: </label>
                     <wave-select 
                     v-model="formData.regions"
-                    :options="regionsOptions">
+                    :options="regionsOptions"
+                    :id="'regions'"
+                    class="form-control">
                     </wave-select>
                 </div>
             </template>
             <template v-slot:button>
-                
+                <wave-button class="form-button"></wave-button>
             </template>
         </wave-form>
 </template>

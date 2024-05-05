@@ -1,25 +1,36 @@
 import {TRANSACTIONS, Keypair, CONTRACT_ID, sdk, contractVersion} from "@/contractData";
-export default function userOrderReview(formData) {
-    const func = async () => {
+import store from "@/store";
+
+export default function userOrderReview(order_id, accept) {
+    const userOrderReviewTx = async () => {
         const config = await sdk.node.config();
 
         const fee = await config.minimumFee[104];
-        const SEED = '';
+        const SEED = store.state.auth.seed;
 
         const keypair = await Keypair.fromExistingSeedPhrase(SEED);
         const publicKey = await keypair.publicKey();
-
-        const tx = await TRANSACTIONS.CallContract.V2({
+        const tx = TRANSACTIONS.CallContract.V2({
             contractId: CONTRACT_ID,
             fee: fee,
-            senderPublicKey: public_key,
+            senderPublicKey: publicKey,
             contractVersion: contractVersion,
             params: [
                 
                 {
+                    type: 'string',
                     key: "tx_type",
                     value: "user_order_review",
-                    type: "string"
+                },
+                {
+                    type: "boolean",
+                    key: "accept",
+                    value: accept,
+                },
+                {
+                    type: "integer",
+                    key: "order_id",
+                    value: order_id
                 }
             ]
         });
@@ -28,4 +39,6 @@ export default function userOrderReview(formData) {
         const res = await sdk.broadcast(signedTx);
         console.log(res);
     }
+
+    return {userOrderReviewTx}
 }
