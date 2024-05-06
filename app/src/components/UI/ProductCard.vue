@@ -13,7 +13,7 @@ export default {
     <div>
         <h1>{{ product.title }}</h1>
         <span>{{ product.regions }}</span>
-        <wave-button @click="$router.push('/createOrder')">Заказать</wave-button>
+        <wave-button @click="$router.push(`/createOrder/${product.id}`)">Заказать</wave-button>
     </div>
 </template>
 

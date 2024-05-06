@@ -88,11 +88,11 @@ export default {
             <h2>Подтвердить создание товара</h2>
             <ProductsReviewList :arr="reviewProducts" @remove="removeProductRequest"></ProductsReviewList>
         </div>
-        <div>
+        <div v-if="role === 'operator' || role === 'distributor'">
             <h2>Подтвердить создание заказа</h2>
             <OrdersReviewList :arr="reviewOrders" @remove="removeOrderRequest"></OrdersReviewList>
         </div>
-        <div>
+        <div v-if="role === 'user'">
             <h2>Принять изменения в заказе</h2>
             <UserOrdersReviewList :arr="userReviewOrders" @remove="removeUserOrderRequest"></UserOrdersReviewList>
         </div>

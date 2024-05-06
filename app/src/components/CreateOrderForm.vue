@@ -2,9 +2,14 @@
 import {ref} from "vue";
 import createOrder from "@/hooks/createOrder";
 import router from "@/router";
+import { useRoute } from 'vue-router';
 export default {
+    props: ['id'],
     setup() {
+        const route = useRoute()
+
         const formData = ref({
+            product_id: parseInt(route.params.id),
             volume: '',
             date: '',
             country: '',
@@ -24,16 +29,17 @@ export default {
             formData.value.pre_payment = event.target.checked;
         };
 
-        return { formData, createOrderHook, togglePrePayment };
+        return { formData, createOrderHook, togglePrePayment , route};
     }
 }
 </script>
 
 <template>
     <div>
+
         <wave-form class="default-form" @submit.prevent="createOrderHook()">
             <template v-slot:header>
-                <h1 class="form-header">Создать Заказ</h1>
+                <h1 class="form-header">Создать Заказ {{ route.params.id }}</h1>
             </template>
             <template v-slot:fields>
                 <div class="form-group">

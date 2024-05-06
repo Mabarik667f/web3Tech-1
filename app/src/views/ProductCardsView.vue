@@ -8,7 +8,6 @@ export default {
 
     setup() {
         const {reviewProducts} = getSellers();
-        console.log(reviewProducts)
         return {reviewProducts}
     }
 }

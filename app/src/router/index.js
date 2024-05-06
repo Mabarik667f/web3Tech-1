@@ -57,9 +57,10 @@ const routes = [
     component: CreateProductView,
   },
   {
-    path: '/createOrder',
+    path: '/createOrder/:id',
     name: 'createOrder',
     component: CreateOrderView,
+    props: true
   },
   {
     path: '/login',
